@@ -1,0 +1,52 @@
+DIRECTORIES:
+    DATA_DIR: 'data'
+    MODEL_DIR: 'models'
+    RESULTS_DIR: 'results'
+
+DATA_INFO:
+    CATEGORICAL_COLS:
+        - 'Gender'
+        - 'Education_Level'
+        - 'Marital_Status'
+        - 'Income_Category'
+        - 'Card_Category'
+    NUMERICAL_COLS:
+        - 'Customer_Age'
+        - 'Dependent_count'
+        - 'Months_on_book',
+        - 'Total_Relationship_Count'
+        - 'Months_Inactive_12_mon'
+        - 'Contacts_Count_12_mon'
+        - 'Credit_Limit'
+        - 'Total_Revolving_Bal'
+        - 'Avg_Open_To_Buy'
+        - 'Total_Amt_Chng_Q4_Q1'
+        - 'Total_Trans_Amt'
+        - 'Total_Trans_Ct'
+        - 'Total_Ct_Chng_Q4_Q1'
+        - 'Avg_Utilization_Ratio'
+    TARGET_COL: 'Attrition_Flag'
+    ENCODING_TARGET:
+        0: 'Existing Customer'
+        1: 'Attrited Customer'
+TEST_SIZE: 0.3
+PARAM_GRID:
+    compute: True
+    cv: 5
+    probabilities: True
+    n_estimators:
+        - 200
+        - 500
+    max_features:
+        - 'auto'
+        - 'sqrt'
+    max_depth:
+        - 4
+        - 5
+        - 100
+    criterion:
+        - 'gini'
+        - 'entropy'
+LOGISTIC_REGRESSION:
+    MAX_ITER: 200
+RANDOM_STATE: 42
