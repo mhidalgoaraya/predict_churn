@@ -1,25 +1,25 @@
 from pathlib import Path
-from omegaconf import DictConfig
+from omegaconf import DictConfig, OmegaConf
 from utils.utils import logging
 from preprocessing.make_model import CustomerChurn
+import logging
 
-project_path = Path(__file__).parent.parent
-config_path = str((project_path / 'config').as_posix())
+logging.getLogger(__name__)
 
 
-def run(config:DictConfig):
+def run(config: DictConfig):
     try:
-        logging.error(f'Error: Data path does not exist')
-
-        prediction = CustomerChurn(config:DictConfig)
-        prediction.compute()
-        logging.info('INFO: Script executed')
-
-    except:
-        logging.error(f'Error: Error while starting execution')
+        prediction = CustomerChurn(config)
+        prediction.predict()
+        logging.info('Script executed')
+    except BaseException as e:
+        logging.error(f'{e} Error while starting execution')
 
 
 if __name__ == "__main__":
-    config = DictConfig(config_path)
-    config['PROJECT_DIR'] = str(project_path).as_posix()
+    logging.info("nitializing script")
+    project_path = Path.cwd()
+    config_path = (project_path / 'config'/'config.yaml')
+    config = OmegaConf.load(config_path)
+    config['DIRECTORIES']['PROJECT_DIR'] = str(project_path)
     run(config)

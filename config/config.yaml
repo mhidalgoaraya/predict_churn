@@ -1,3 +1,5 @@
+
+name: 'Predict_customer_churn'
 DIRECTORIES:
     DATA_DIR: 'data'
     MODEL_DIR: 'models'
@@ -13,7 +15,7 @@ DATA_INFO:
     NUMERICAL_COLS:
         - 'Customer_Age'
         - 'Dependent_count'
-        - 'Months_on_book',
+        - 'Months_on_book'
         - 'Total_Relationship_Count'
         - 'Months_Inactive_12_mon'
         - 'Contacts_Count_12_mon'

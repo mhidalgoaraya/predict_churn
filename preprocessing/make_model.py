@@ -5,7 +5,8 @@ from pathlib import Path
 import shap
 import numpy as np
 from utils.utils import create_dir, logging, import_data, split_data, \
-    train_model
+    train_model, corrplot
+
 from omegaconf import DictConfig
 
 from sklearn.metrics import plot_roc_curve, classification_report
@@ -14,27 +15,26 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier
 
 
-#%% Evaluate Object
+# %% Evaluate Object
 class Evaluate:
     """
     Evaluate model
     """
 
-    def __init__(self):
+    def __init__(self, config):
         super(Evaluate, self).__init__()
 
     def eval(self, model, train_data: pd.DataFrame, test_data: pd.DataFrame,
              labels, predictions, save_results_dir: Path):
         """
-        Function that calls all actions for model evaluation
-        :@param model: skelearn objec
-        :@param train_data: data used for trainning
-        :@param test_data: data for testing
-        :@param labels: ground truth labels
-        :@param predictions: predictions made by the model
-        :@param save_results_dir: directory to save results
-        :@return : figures model evaluation
-        """
+        :param model: 
+        :param train_data: 
+        :param test_data: 
+        :param labels: 
+        :param predictions: 
+        :param save_results_dir: 
+        :return: 
+        """""
         try:
             if isinstance(model, GridSearchCV):
                 model_name = type(model.best_estimator_).__name__
@@ -97,7 +97,7 @@ class Evaluate:
         :return:
         """
         try:
-            plt.figure(figsize=(10,8))
+            plt.figure(figsize=(10, 8))
             ax = plt.gca()
         except ValueError:
             logging.error(f'ERROR: ROC not computed {ValueError}')
@@ -136,8 +136,8 @@ class Evaluate:
 
     @staticmethod
     def get_features_importances(feature_names: pd.Index,
-                                     coefficients: np.array, model_name: str,
-                                     output_dir: str):
+                                 coefficients: np.array, model_name: str,
+                                 output_dir: str):
         """
         Compute features importances and save them into a png file
         :param feature_names: column names used for training
@@ -169,31 +169,128 @@ class Evaluate:
 
 
 class EncoderHelper:
-    """
-    '''
-    helper function to turn each categorical column into a new column with
-    proportion of churn for each category
 
-    input:
-            df: pandas dataframe
-            category_lst: list of columns that contain categorical features
-            response: string of response name [optional argument that could be used for naming variables or index y column]
-
-    output:
-            df: pandas dataframe with new columns for
-    '''
-    """
-    def __init__(self):
+    def __init__(self, config):
         pass
+
 
 class DataExploration:
-    def __init__(self):
-        pass
+    def __init__(self, config:DictConfig):
+        self.config = config
+
+    def eda(self, data):
+        """
+
+        :param data:
+        :param save_dir:
+        :return:
+        """
+        try:
+            save_dir = Path(self.config['DIRECTORIES']['PROJECT_DIR'], self.config['DIRECTORIES']['RESULTS_DIR'], 'EDA')
+            create_dir(save_dir)
+            logging.info(f'Starting EDA analysis. Saving Results in {save_dir}')
+
+            # Unavariate analysis
+            self.univariate_exploration(data, self.config['DATA_INFO'], save_dir)
+            self.bivariate_exploration(data, self.config['DATA_INFO'], save_dir)
+            self.correlation_matrix(data, save_dir)
+
+        except BaseException as e:
+            logging.error(f" Unable to perform EDA analysis {e}")
+
+    @staticmethod
+    def univariate_exploration(data: pd.DataFrame, data_info: dict, save_dir):
+        try:
+            for category in data_info:
+                cat = 'CATEGORICAL_COLS'
+                num = 'NUMERICAL_COLS'
+                if (category == cat) or (category == num):
+                    logging.info(f' exploration on {category}')
+                    if category == cat:
+                        plot = getattr(sns, 'histplot')
+                        features = data_info[cat]
+                        type = 'histogram'
+                    else:
+                        plot = getattr(sns, 'distplot')
+                        features = data_info[num]
+                        type = 'distplot'
+
+                    for feature in features:
+                        plotting = plot(data[feature])
+                        name = 'univariate_exploration ' + type + ' ' + feature + '.png'
+                        plotting.figure.savefig(Path(save_dir, name))
+                        logging.info(f' univarite exploration computed and saved in {feature}')
+
+        except BaseException as e:
+            logging.error(f' {e} Unable to compute and save univariate analysis')
+
+    @staticmethod
+    def bivariate_exploration(data: pd.DataFrame, data_info: dict, save_dir: Path):
+        try:
+            for category in data_info:
+                cat = 'CATEGORICAL_COLS'
+                num = 'NUMERICAL_COLS'
+                target = 'TARGET_COL'
+                if (category == cat) or (category == num):
+                    logging.info(f' exploration on {category}')
+                    if category == cat:
+                        plot = getattr(sns, 'catplot')
+                        features = data_info[cat]
+                        type = 'catplot'
+                    else:
+                        plot = getattr(sns, 'histplot')
+                        features = data_info[num]
+                        type = 'hisplot'
+
+                    for feature in features:
+                        if type == 'histplot':
+                            plotting = plot(data, x=feature, hue=target)
+                        else:
+                            plotting = plot(data, x=feature, hue=target, kind='count')
+                        name = 'bivariate_exploration ' + type + ' ' + feature + '.png'
+                        plotting.figure.savefig(Path(save_dir, name))
+                        logging.info(f' bivariate exploration computed and saved in {feature}')
+
+        except BaseException as e:
+            logging.error(f' {e} Unable to compute and save bivariate analysis')
+
+
+    @staticmethod
+    def correlation_matrix(data:pd.DataFrame, data_info:dict, save_dir:Path):
+        try:
+            # General corrrelation matrix
+
+            name = 'correlation_matrix.png'
+            figure.savefig(Path(save_dir, name))
+            # Beutiful correlation plot taken from:
+            # https://towardsdatascience.com/better-heatmaps-and-correlation-matrix-plots-in-python-41445d0f2bec
+
+            corr = data.corr()
+            corr = pd.melt(corr.reset_index(), id_vars='index')  # Unpivot the dataframe, so we can get pair of arrays for x and y
+            corr.columns = ['x', 'y', 'value']
+
+            plt.figure(figsize=(10, 10))
+            corrplot(corr)
+
+
+
+            #Correlation matrix with dependent variable
+            fig = plt.figure(figsize=(10,15))
+            target = data_info['TARGET_COL']
+            heatmap = sns.heatmap(data.corr()[[target]].sort_values(by=target, ascending=False),
+                                  vmin=-1, vmax=1, annot=True, cmap='BrBG')
+            name = f'Features correlated with {target}'
+            heatmap.set_title(name)
+            fig.savefig(Path(save_dir, name + '.png'))
+
+        except BaseException as e:
+            logging.error(f'{e} unable to compute correlation matrix')
+
+
 
 class CustomerChurn(DataExploration, EncoderHelper, Evaluate):
 
-    def __init__(self, config:DictConfig):
-        DataExploration.__init__(self, config)
+    def __init__(self, config: DictConfig):
         DataExploration.__init__(self, config)
         EncoderHelper.__init__(self, config)
         Evaluate.__init__(self, config)
@@ -202,11 +299,11 @@ class CustomerChurn(DataExploration, EncoderHelper, Evaluate):
     def predict(self):
         try:
             project_dir = self.config['DIRECTORIES']['PROJECT_DIR']
-            DATA_PATH = Path(project_dir, self.config['DIRECTORY']['DATA_DIR'])
-            df = import_data(DATA_PATH)
+            data_dir = Path(project_dir, self.config['DIRECTORIES']['DATA_DIR'], 'bank_data.csv')
+            df = import_data(data_dir)
 
             # %% Preprocessing
-            self.eda(df, self.config)
+            self.eda(df)
             self.encoder(df, self.config['TARGET_COL'])
             (x_train, x_test, y_train, y_test), feature_names = \
                 split_data(df, 'Churn', self.config['TEST_SIZE'],
@@ -225,7 +322,7 @@ class CustomerChurn(DataExploration, EncoderHelper, Evaluate):
                 if model == lcr:
                     model_fitted, predictions = train_model(x_train,
                                                             x_test, y_train,
-                                                            y_test ,model,
+                                                            y_test, model,
                                                             save_dir=
                                                             save_model_dir)
                 elif model == rfc:
@@ -235,13 +332,13 @@ class CustomerChurn(DataExploration, EncoderHelper, Evaluate):
                                                             model,
                                                             save_dir=
                                                             save_model_dir,
-                                                            param_grid =
+                                                            param_grid=
                                                             PARAM)
                 logging.info(f'INFO: Models trained')
 
-                #Evaluate
+                # Evaluate
                 save_results_dir = Path(project_dir,
-                                  self.config['DIRECTORIES']['RESULTS_DIR'])
+                                        self.config['DIRECTORIES']['RESULTS_DIR'])
                 self.evaluate(model_fitted, x_train, x_test, y_test,
                               predictions, save_results_dir)
 
