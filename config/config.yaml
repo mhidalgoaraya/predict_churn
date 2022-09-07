@@ -31,6 +31,7 @@ DATA_INFO:
     ENCODING_TARGET:
         0: 'Existing Customer'
         1: 'Attrited Customer'
+    NEW_TARGET_COL: 'Churn'
 TEST_SIZE: 0.3
 PARAM_GRID:
     compute: True

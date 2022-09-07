@@ -1,0 +1,3 @@
+#!/Users/marcohidalgo/Documents/Python Repositories/predict_churn/venv/bin/python
+from numba.pycc import main
+main()

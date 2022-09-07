@@ -171,7 +171,45 @@ class Evaluate:
 class EncoderHelper:
 
     def __init__(self, config):
-        pass
+        self.config = config
+
+    def encode(self, data):
+        try:
+            data[self.config['DATA_INFO']['NEW_TARGET_COL']] = self.get_encoding(data, self.config['DATA_INFO'])
+            data = data.drop(self.config['DATA_INFO']['TARGET_COL'], axis=1)
+            logging.info(f'Target column has been encoded')
+
+            data = self.get_categorical_mean_encoding(data, self.config['DATA_INFO'])
+            logging.info(f'Categorical features encoded')
+            return data
+
+        except BaseException as e:
+            logging.error(f'{e} Unable to encode the outcome variable')
+
+    @staticmethod
+    def get_encoding(data, data_info:dict):
+        try:
+            target = data_info['TARGET_COL']
+            target_encoding = data_info['ENCODING_TARGET']
+            enc_dict = {}
+            for key, value in target_encoding.items():
+                enc_dict = {key: data[target] == value}
+            return np.select(enc_dict.values(), enc_dict.keys())
+        except BaseException as e:
+            logging.info(f'Unable to encode target feature {e}')
+
+    @staticmethod
+    def get_categorical_mean_encoding(data: pd.DataFrame, data_info: dict):
+        """
+        :param data:
+        :param data_info:
+        :return:
+        """
+        for feature in data_info['CATEGORICAL_COLS']:
+            feature_groups = round(data.groupby(feature).mean()[data_info['NEW_TARGET_COL']], 2)
+            data[f'{feature}_{data_info["NEW_TARGET_COL"]}'] = data[feature].map(feature_groups)
+            data = data.drop(feature, axis=1)
+        return data
 
 
 class DataExploration:
@@ -193,7 +231,7 @@ class DataExploration:
             # Unavariate analysis
             self.univariate_exploration(data, self.config['DATA_INFO'], save_dir)
             self.bivariate_exploration(data, self.config['DATA_INFO'], save_dir)
-            self.correlation_matrix(data, save_dir)
+            self.correlation_matrix(data, self.config['DATA_INFO'], save_dir)
 
         except BaseException as e:
             logging.error(f" Unable to perform EDA analysis {e}")
@@ -211,14 +249,17 @@ class DataExploration:
                         features = data_info[cat]
                         type = 'histogram'
                     else:
-                        plot = getattr(sns, 'distplot')
+                        plot = getattr(sns, 'displot')
                         features = data_info[num]
                         type = 'distplot'
 
                     for feature in features:
                         plotting = plot(data[feature])
                         name = 'univariate_exploration ' + type + ' ' + feature + '.png'
+                        plt.xticks(rotation=45)
+                        plt.xlabel(feature)
                         plotting.figure.savefig(Path(save_dir, name))
+                        plt.close()
                         logging.info(f' univarite exploration computed and saved in {feature}')
 
         except BaseException as e:
@@ -230,7 +271,7 @@ class DataExploration:
             for category in data_info:
                 cat = 'CATEGORICAL_COLS'
                 num = 'NUMERICAL_COLS'
-                target = 'TARGET_COL'
+                target = data_info['TARGET_COL']
                 if (category == cat) or (category == num):
                     logging.info(f' exploration on {category}')
                     if category == cat:
@@ -240,15 +281,17 @@ class DataExploration:
                     else:
                         plot = getattr(sns, 'histplot')
                         features = data_info[num]
-                        type = 'hisplot'
+                        type = 'histplot'
 
                     for feature in features:
                         if type == 'histplot':
-                            plotting = plot(data, x=feature, hue=target)
+                            plotting = plot(data=data, x=feature, hue=target)
                         else:
-                            plotting = plot(data, x=feature, hue=target, kind='count')
+                            plotting = plot(data=data, x=feature, hue=target, kind='count')
                         name = 'bivariate_exploration ' + type + ' ' + feature + '.png'
+                        plt.xticks(rotation=45)
                         plotting.figure.savefig(Path(save_dir, name))
+                        plt.close()
                         logging.info(f' bivariate exploration computed and saved in {feature}')
 
         except BaseException as e:
@@ -258,30 +301,13 @@ class DataExploration:
     @staticmethod
     def correlation_matrix(data:pd.DataFrame, data_info:dict, save_dir:Path):
         try:
-            # General corrrelation matrix
 
-            name = 'correlation_matrix.png'
-            figure.savefig(Path(save_dir, name))
             # Beutiful correlation plot taken from:
             # https://towardsdatascience.com/better-heatmaps-and-correlation-matrix-plots-in-python-41445d0f2bec
-
             corr = data.corr()
-            corr = pd.melt(corr.reset_index(), id_vars='index')  # Unpivot the dataframe, so we can get pair of arrays for x and y
-            corr.columns = ['x', 'y', 'value']
-
-            plt.figure(figsize=(10, 10))
+            fig = plt.figure(figsize=(10, 10))
             corrplot(corr)
-
-
-
-            #Correlation matrix with dependent variable
-            fig = plt.figure(figsize=(10,15))
-            target = data_info['TARGET_COL']
-            heatmap = sns.heatmap(data.corr()[[target]].sort_values(by=target, ascending=False),
-                                  vmin=-1, vmax=1, annot=True, cmap='BrBG')
-            name = f'Features correlated with {target}'
-            heatmap.set_title(name)
-            fig.savefig(Path(save_dir, name + '.png'))
+            fig.savefig(Path(save_dir, 'correlation_matrix' + '.png'))
 
         except BaseException as e:
             logging.error(f'{e} unable to compute correlation matrix')
@@ -304,41 +330,29 @@ class CustomerChurn(DataExploration, EncoderHelper, Evaluate):
 
             # %% Preprocessing
             self.eda(df)
-            self.encoder(df, self.config['TARGET_COL'])
+            data = self.encode(df)
             (x_train, x_test, y_train, y_test), feature_names = \
-                split_data(df, 'Churn', self.config['TEST_SIZE'],
+                split_data(data, self.config['DATA_INFO']['NEW_TARGET_COL'], self.config['TEST_SIZE'],
                            self.config['RANDOM_STATE'])
 
             ## Init Models
-            lcr = LogisticRegression(max_iter=self.config['LOGISTIC_REGRESSION']
-            ['MAX_ITER'])
+            lcr = LogisticRegression(max_iter=self.config['LOGISTIC_REGRESSION']['MAX_ITER'])
             rfc = RandomForestClassifier(random_state=self.config['RANDOM_STATE'])
 
-            save_model_dir = Path(project_dir,
-                                  self.config['DIRECTORIES']['MODEL_DIR'])
+            save_model_dir = Path(project_dir, self.config['DIRECTORIES']['MODEL_DIR'])
 
             ## Train
             for model in [lcr, rfc]:
                 if model == lcr:
-                    model_fitted, predictions = train_model(x_train,
-                                                            x_test, y_train,
-                                                            y_test, model,
-                                                            save_dir=
-                                                            save_model_dir)
+                    model_fitted, predictions = train_model(x_train, x_test, y_train, y_test, model, param_grid=None,
+                                                            save_dir=save_model_dir)
                 elif model == rfc:
-                    PARAM = self.config['PARAM_GRID']
-                    model_fitted, predictions = train_model(x_train, x_test,
-                                                            y_train, y_test,
-                                                            model,
-                                                            save_dir=
-                                                            save_model_dir,
-                                                            param_grid=
-                                                            PARAM)
+                    model_fitted, predictions = train_model(x_train, x_test, y_train, y_test, model,
+                                                            param_grid=self.config['PARAM_GRID'], save_dir=save_model_dir)
                 logging.info(f'INFO: Models trained')
 
                 # Evaluate
-                save_results_dir = Path(project_dir,
-                                        self.config['DIRECTORIES']['RESULTS_DIR'])
+                save_results_dir = Path(project_dir, self.config['DIRECTORIES']['RESULTS_DIR'])
                 self.evaluate(model_fitted, x_train, x_test, y_test,
                               predictions, save_results_dir)
 

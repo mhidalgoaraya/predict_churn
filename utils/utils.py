@@ -30,7 +30,7 @@ def import_data(file_dir) -> pd.DataFrame:
         logging.error(f"{e}, unable to import data")
 
 
-def split_data(df: pd.DataFrame, target: str, test_size: float,
+def split_data(data: pd.DataFrame, target: str, test_size: float,
                random_state: int):
     """
 
@@ -42,14 +42,10 @@ def split_data(df: pd.DataFrame, target: str, test_size: float,
     """
 
     try:
-        df.select_dtype(exclude=['object'])
-        X = df.drop(target, axis=1)
-        Y = df[target]
-        x_train, x_test, y_train, y_test, feature_names = \
-            train_test_split(X, Y, test_size=test_size,
-                             random_state=random_state), \
-            df.drop(target, axis=1).columns
-
+        X = data.drop(target, axis=1)
+        Y = data[target]
+        x_train, x_test, y_train, y_test = train_test_split(X, Y, test_size=test_size, random_state=random_state)
+        feature_names = X.columns
         logging.info(f"INFO: Data splitted")
         return (x_train, x_test, y_train, y_test), feature_names
     except KeyError:
@@ -57,8 +53,7 @@ def split_data(df: pd.DataFrame, target: str, test_size: float,
 
 
 def train_model(X_train: pd.DataFrame, X_test: pd.DataFrame,
-                y_train: pd.Series, y_test: pd.Series, model, save_dir: Path,
-                param_grid:dict):
+                y_train: pd.Series, y_test: pd.Series, model, save_dir, param_grid:dict=None):
     """
 
     :param model:
@@ -73,24 +68,29 @@ def train_model(X_train: pd.DataFrame, X_test: pd.DataFrame,
     """
 
     try:
-        if grid_search:
-            g_search = GridSearchCV(estimator=model,
-                                    param_grid=param_grid,
-                                    cv=cv, n_jobs=n_jobs, verbose=verbose)
-            model_fit = g_search.fit(X_train, y_train)
+        if param_grid is not None:
+            if param_grid['compute']:
+                g_search = GridSearchCV(estimator=model,
+                                        param_grid=param_grid,
+                                        cv=param_grid['cv'], n_jobs=param_grid['n_jobs'])
+                model_fit = g_search.fit(X_train, y_train)
         else:
             model_fit = model.fit(X_train, y_train)
 
         logging.info(f'{model_fit} has been fitted')
 
-        if save_dir:
+        if save_dir is not None:
             save_model(save_dir, model)
             logging.info(f'Model saved: {model_fit}')
 
-        predictions = model_fit.predict_probalities(X_test) \
-            if probabilities else model_fit.predict(X_test)
-        logging.info(f'Prediction made on test '
-                     f'data using probability = {probabilities}')
+        if param_grid is not None:
+            if param_grid['probabilities']:
+                predictions = model_fit.predict_probalities(X_test)
+                logging.info(f'Prediction made on test data using probability')
+        else:
+            predictions = model_fit.predict(X_test)
+            logging.info(f'Prediction made on standard model fit')
+
         return model_fit, predictions
 
     except TypeError:
