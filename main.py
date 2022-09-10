@@ -6,8 +6,8 @@ Author: marco Hidalgo
 from pathlib import Path
 import logging
 from omegaconf import DictConfig, OmegaConf
-from utils.utils import logging
-from preprocessing.churn_library import CustomerChurn
+from utils_ import logging
+from churn_library import CustomerChurn
 
 
 logging.getLogger(__name__)
