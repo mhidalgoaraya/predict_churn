@@ -150,13 +150,6 @@ def load_model(path):
         logging.error('Unable to load the specified model {}'.format(err))
 
 
-# Configure logging
-with open(Path(Path.cwd(), 'config', 'logging.yaml'), 'r') as stream:
-    config = yaml.load(stream, Loader=yaml.FullLoader)
-
-logging.config.dictConfig(config)
-
-
 # Taken from https://www.kaggle.com/code/drazen/heatmap-with-
 # sized-markers/notebook
 def heatmap(x, y, **kwargs):

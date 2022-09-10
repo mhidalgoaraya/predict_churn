@@ -1,7 +1,7 @@
 """
 Testing Functions
 """
-
+import yaml
 import logging
 from pathlib import Path
 import pandas as pd
@@ -9,14 +9,20 @@ import numpy as np
 import pytest
 from omegaconf import OmegaConf
 from churn_library import DataExploration, EncoderHelper
-from utils_ import split_data, train_model
+from utils_ import split_data, train_model, import_data
 from numpy.testing import assert_array_almost_equal
 from sklearn.linear_model import LogisticRegression
 
+# Configure logging
+with open(Path(Path.cwd().parent, 'config', 'logging.yaml'), 'r') as stream:
+    config = yaml.load(stream, Loader=yaml.FullLoader)
 
-def test_import(import_data):
+logging.config.dictConfig(config)
+
+
+def test_import():
     try:
-        data = import_data("./data/bank_data.csv")
+        data = import_data(Path(Path.cwd().parent, "data/bank_data.csv"))
         logging.info("Testing import_data: SUCCESS")
     except FileNotFoundError as err:
         logging.error(
@@ -47,7 +53,7 @@ def input_data_num_cat():
 
 @pytest.fixture()
 def config_test():
-    project_path = Path.cwd()
+    project_path = Path.cwd().parent
     config_path = (project_path / 'config' / 'test_config.yaml')
     config = OmegaConf.load(config_path)
     config['DIRECTORIES']['PROJECT_DIR'] = str(project_path)
@@ -98,7 +104,7 @@ def test_encoder(input_data, output_data, config_test):
     try:
         target = config_test['DATA_INFO']['NEW_TARGET_COL']
         numeric = ['int64', 'float64']
-        assert result.filter(regex=target).dtypes.isin(numeric).all()
+        assert pd.DataFrame(result).filter(regex=target).dtypes.isin(numeric).all()
     except TypeError as err:
         logging.error('{} variables are not numeric'.format(err))
 
@@ -121,31 +127,28 @@ def test_split(input_data3, config_test):
             input_data3,
             config_test['DATA_INFO']['NEW_TARGET_COL'],
             config_test['TEST_SIZE'], config_test['RANDOM_STATE'])
-        assert x_train.shape == (7, 2)
-        assert x_test.shape == (3, 2)
+        assert x_train.shape == (7, 3)
+        assert x_test.shape == (3, 3)
         assert (type(y_train), type(y_test)) == (pd.Series, pd.Series)
         assert (len(y_train), len(y_test)) == (7, 3)
         logging.info('Testing split succcesful')
     except KeyError as err:
         logging.error('Unable to test {}'.format(err))
 
-@pytest.fixture
-def data_sample():
-    data_path = Path('tests/data/bank_data_sample.csv')
-    df = pd.read_csv(data_path)
-    x_train, x_test, y_train, y_test = split_data(
-        df,
-        config_test['DATA_INFO']['NEW_TARGET_COL'],
-        config_test['TEST_SIZE'], config_test['RANDOM_STATE'])
-    return (x_train, x_test, y_train, y_test)
 
+@pytest.fixture
+def data_sample(config_test):
+    df = import_data(Path(Path.cwd().parent, "data/bank_data.csv"))
+    return split_data(df, config_test['DATA_INFO']['NEW_TARGET_COL'],
+                      config_test['TEST_SIZE'], config_test['RANDOM_STATE'])
 
 def test_train_models(data_sample):
 
     try:
-        (x_train, x_test, y_train, y_test) = data_sample
-        lrc: LogisticRegression = LogisticRegression(max_iter=100)
-        fitted_model, predictions = train_model(x_train, y_test, y_train, lrc)
+        x_train, x_test, y_train, y_test = data_sample
+        lrc = LogisticRegression(max_iter=100)
+        fitted_model, predictions = train_model(x_train, y_test, y_train, lrc,
+                                                save_dir=None)
         assert_array_almost_equal(np.round(fitted_model.intercept_, 3),
                                   [0.035], decimal=1)
         assert_array_almost_equal(fitted_model.coef_, [
@@ -158,7 +161,7 @@ def test_train_models(data_sample):
              6.83536439e-03]], decimal=1)
         assert len(predictions) == 300
         assert max(predictions), min(predictions) == (0, 1)
-        logging.info('Model fitted')
+
     except BaseException as err:
         logging.error('model fitting {}'.format(err))
 
