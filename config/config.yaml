@@ -37,19 +37,22 @@ PARAM_GRID:
     compute: True
     cv: 5
     probabilities: True
-    n_estimators:
-        - 200
-        - 500
-    max_features:
-        - 'auto'
-        - 'sqrt'
-    max_depth:
-        - 4
-        - 5
-        - 100
-    criterion:
-        - 'gini'
-        - 'entropy'
+    parameters:
+        n_estimators:
+            - 200
+            - 500
+        max_features:
+            - 'auto'
+            - 'sqrt'
+        max_depth:
+            - 4
+            - 5
+            - 100
+        criterion:
+            - 'gini'
+            - 'entropy'
+    n_jobs: -1
+    verbose: 2
 LOGISTIC_REGRESSION:
     MAX_ITER: 200
 RANDOM_STATE: 42

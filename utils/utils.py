@@ -11,6 +11,7 @@ import logging.config
 import yaml
 import matplotlib.pyplot as plt
 import seaborn as sns
+import omegaconf
 
 
 sns.set()
@@ -44,7 +45,8 @@ def split_data(data: pd.DataFrame, target: str, test_size: float,
     try:
         X = data.drop(target, axis=1)
         Y = data[target]
-        x_train, x_test, y_train, y_test = train_test_split(X, Y, test_size=test_size, random_state=random_state)
+        x_train, x_test, y_train, y_test = train_test_split(X, Y, test_size=test_size, random_state=random_state,
+                                                            shuffle=True, stratify=Y)
         feature_names = X.columns
         logging.info(f"INFO: Data splitted")
         return (x_train, x_test, y_train, y_test), feature_names
@@ -71,8 +73,8 @@ def train_model(X_train: pd.DataFrame, X_test: pd.DataFrame,
         if param_grid is not None:
             if param_grid['compute']:
                 g_search = GridSearchCV(estimator=model,
-                                        param_grid=param_grid,
-                                        cv=param_grid['cv'], n_jobs=param_grid['n_jobs'])
+                                        param_grid=dict(param_grid['parameters']),
+                                        cv=param_grid['cv'], n_jobs=param_grid['n_jobs'], verbose=param_grid['verbose'])
                 model_fit = g_search.fit(X_train, y_train)
         else:
             model_fit = model.fit(X_train, y_train)
@@ -81,11 +83,11 @@ def train_model(X_train: pd.DataFrame, X_test: pd.DataFrame,
 
         if save_dir is not None:
             save_model(save_dir, model)
-            logging.info(f'Model saved: {model_fit}')
+            logging.info(f'Model saved: {model}')
 
         if param_grid is not None:
             if param_grid['probabilities']:
-                predictions = model_fit.predict_probalities(X_test)
+                predictions = model_fit.predict_proba(X_test)
                 logging.info(f'Prediction made on test data using probability')
         else:
             predictions = model_fit.predict(X_test)
@@ -93,8 +95,8 @@ def train_model(X_train: pd.DataFrame, X_test: pd.DataFrame,
 
         return model_fit, predictions
 
-    except TypeError:
-        logging.error(f'{TypeError} Unable to fit the model')
+    except (TypeError, omegaconf.errors.ConfigKeyError, AttributeError) as e:
+        logging.error(f'{e} Unable to fit the model')
 
 
 def create_dir(path: Path):

@@ -21,7 +21,7 @@ class Evaluate:
     Evaluate model
     """
 
-    def __init__(self, config):
+    def __init__(self):
         super(Evaluate, self).__init__()
 
     def eval(self, model, train_data: pd.DataFrame, test_data: pd.DataFrame,
@@ -36,6 +36,7 @@ class Evaluate:
         :return: 
         """""
         try:
+            create_dir(save_results_dir)
             if isinstance(model, GridSearchCV):
                 model_name = type(model.best_estimator_).__name__
                 coefficients = model.best_estimator_.feature_importances_
@@ -43,26 +44,13 @@ class Evaluate:
                 model_name = type(model).__name__
                 coefficients = model.coef_[0]
 
-            create_dir(save_results_dir)
-
             self.get_classification_report(labels, predictions, model_name,
                                            save_results_dir)
-            logging.info("INFO:  Classification report computed")
-
             self.get_roc(model, test_data, labels, model_name, save_results_dir)
-            logging.info("INFO: ROC curve computed")
-
-            self.get_shapley_values(model, test_data, save_results_dir,
-                                    model_name, train_data)
-            logging.info("INFO: Shapley values computed")
-
-            self.features_importances(train_data.columns, coefficients,
-                                      model_name, save_results_dir)
-            logging.info("INFO: Feature importance")
-
-        except Exception:
-            logging.error(
-                f'ERROR: Not able to compute evaluation: {Exception}')
+            self.get_shapley(model, test_data, train_data, save_results_dir, model_name)
+            self.get_features_importances(train_data.columns, coefficients, model_name, save_results_dir)
+        except BaseException as e:
+            logging.error(f'{e} Not able to compute evaluation')
 
     @staticmethod
     def get_classification_report(labels, predictions, model_name,
@@ -79,11 +67,11 @@ class Evaluate:
         try:
             report = pd.DataFrame(
                 classification_report(labels, predictions, output_dict=True))
-            return report.transpose().to_csv(
-                f'{save_results_dir}/{model_name}_classification_report.csv')
-        except Exception:
-            logging.error(f'ERROR: Classification report not computed \
-            {Exception}')
+            report = report.transpose()
+            report.to_csv(f'{save_results_dir}/{model_name}_classification_report.csv')
+            logging.info(f'Clasification report computed and save for {model_name}')
+        except BaseException as e:
+            logging.error(f' {e} Classification report not computed')
 
     @staticmethod
     def get_roc(model, test_data, labels, model_name, save_dir):
@@ -99,8 +87,11 @@ class Evaluate:
         try:
             plt.figure(figsize=(10, 8))
             ax = plt.gca()
-        except ValueError:
-            logging.error(f'ERROR: ROC not computed {ValueError}')
+            plot_roc_curve(model, test_data, labels, ax=ax, alpha=0.8)
+            plt.savefig(Path(save_dir, model_name+'_roc_curve.png'), dpi=300)
+            logging.info(f'ROC curve computed for {model_name}')
+        except ValueError as e:
+            logging.error(f'{e} ROC not computed')
 
     @staticmethod
     def get_shapley(model, train_data, test_data, save_dir, model_name):
@@ -117,39 +108,35 @@ class Evaluate:
             plt.figure(figsize=(20, 10))
             if isinstance(model, GridSearchCV):
                 model = model.best_estimator_
-            if model_name in ['LogisticRegression', 'LinearRegression']:
+
+            if model_name in 'LogisticRegression':
                 masker = shap.maskers.Independent(data=train_data)
                 explainer = shap.LinearExplainer(model, masker=masker)
-            elif model_name in ['RandomForestClassifier']:
+
+            elif model_name in 'RandomForestClassifier':
                 explainer = shap.TreeExplainer(model)
-            else:
-                logging.info('Add your model type to tree, linear, '
-                             'gradient or deep explainer '
-                             'and add condition to this function')
+
             shap_values = explainer.shap_values(test_data)
             shap.summary_plot(shap_values, test_data, show=False)
-            plt.savefig(f'{save_dir}/{type(model).__name__}'
-                        f'_shapley_values.png', bbox_inches='tight')
+            plt.savefig(Path(save_dir, type(model).__name__ + '_shapley_values.png'))
+            logging.info(f'Shapley values computed and saved for {model_name}')
         except (AssertionError, AttributeError, ValueError,
-                TypeError, FileNotFoundError) as err:
-            logging.info(f'ERROR - during shapley values compute: {err}')
+                TypeError, FileNotFoundError) as e:
+            logging.error(f'{e} Unable to compute and plot Shapley values')
 
     @staticmethod
-    def get_features_importances(feature_names: pd.Index,
-                                 coefficients: np.array, model_name: str,
-                                 output_dir: str):
+    def get_features_importances(feature_names: pd.Index, coefficients: np.array, model_name: str, save_dir):
         """
-        Compute features importances and save them into a png file
-        :param feature_names: column names used for training
-        :param coefficients: coefficients of each column used in training which corresponds to their weight
-        in the prediction
-        :param model_name: name of the model used like 'LogisticRegression' or 'RandomForest'
-        :param output_dir: directory where to store result
-        :returns a png file with features importances computed
+
+        :param feature_names:
+        :param coefficients:
+        :param model_name:
+        :param output_dir:
+        :return:
         """
         try:
+            create_dir(save_dir)
             plt.figure(figsize=(20, 10))
-            create_dir(output_dir)
             df = pd.DataFrame(
                 zip(feature_names, coefficients),
                 columns=['feature', 'coefficient']).sort_values(
@@ -159,19 +146,19 @@ class Evaluate:
             sns.barplot(x=df['coefficient'],
                         y=df['feature'])
             # Add chart labels
-            plt.title(model_name + 'FEATURE IMPORTANCE')
-            plt.xlabel('FEATURE IMPORTANCE')
-            plt.ylabel('FEATURE NAMES')
-            plt.savefig(f'{output_dir}/{model_name}_features_importances.png',
-                        bbox_inches='tight')
-        except (ValueError, TypeError, FileNotFoundError) as err:
-            logging.info(f'ERROR - during features importance compute: {err}')
+            plt.title('Feature Importances ' + model_name)
+            plt.xlabel('Importances')
+            plt.ylabel('Names')
+            plt.savefig(Path(save_dir, model_name +'_features_importances.png'))
+            logging.info(f'Feature importance computed and saved for {model_name}')
+        except (ValueError, TypeError, FileNotFoundError) as e:
+            logging.error(f'{e} unable to plot feature importnaces')
 
 
 class EncoderHelper:
 
-    def __init__(self, config):
-        self.config = config
+    def __init__(self):
+        super(EncoderHelper, self).__init__()
 
     def encode(self, data):
         try:
@@ -213,8 +200,8 @@ class EncoderHelper:
 
 
 class DataExploration:
-    def __init__(self, config:DictConfig):
-        self.config = config
+    def __init__(self):
+        super(DataExploration, self).__init__()
 
     def eda(self, data):
         """
@@ -297,7 +284,6 @@ class DataExploration:
         except BaseException as e:
             logging.error(f' {e} Unable to compute and save bivariate analysis')
 
-
     @staticmethod
     def correlation_matrix(data:pd.DataFrame, data_info:dict, save_dir:Path):
         try:
@@ -313,13 +299,12 @@ class DataExploration:
             logging.error(f'{e} unable to compute correlation matrix')
 
 
-
 class CustomerChurn(DataExploration, EncoderHelper, Evaluate):
 
     def __init__(self, config: DictConfig):
-        DataExploration.__init__(self, config)
-        EncoderHelper.__init__(self, config)
-        Evaluate.__init__(self, config)
+        DataExploration.__init__(self)
+        EncoderHelper.__init__(self)
+        Evaluate.__init__(self)
         self.config = config
 
     def predict(self):
@@ -334,28 +319,21 @@ class CustomerChurn(DataExploration, EncoderHelper, Evaluate):
             (x_train, x_test, y_train, y_test), feature_names = \
                 split_data(data, self.config['DATA_INFO']['NEW_TARGET_COL'], self.config['TEST_SIZE'],
                            self.config['RANDOM_STATE'])
-
-            ## Init Models
             lcr = LogisticRegression(max_iter=self.config['LOGISTIC_REGRESSION']['MAX_ITER'])
             rfc = RandomForestClassifier(random_state=self.config['RANDOM_STATE'])
-
             save_model_dir = Path(project_dir, self.config['DIRECTORIES']['MODEL_DIR'])
 
-            ## Train
             for model in [lcr, rfc]:
                 if model == lcr:
-                    model_fitted, predictions = train_model(x_train, x_test, y_train, y_test, model, param_grid=None,
-                                                            save_dir=save_model_dir)
+                    param = None
                 elif model == rfc:
-                    model_fitted, predictions = train_model(x_train, x_test, y_train, y_test, model,
-                                                            param_grid=self.config['PARAM_GRID'], save_dir=save_model_dir)
-                logging.info(f'INFO: Models trained')
+                    param = self.config['PARAM_GRID']
 
-                # Evaluate
+                model_fitted, predictions = train_model(x_train, x_test, y_train, y_test, model, param_grid=param,
+                                                        save_dir=save_model_dir)
+                logging.info(f'Model {model} trained')
                 save_results_dir = Path(project_dir, self.config['DIRECTORIES']['RESULTS_DIR'])
-                self.evaluate(model_fitted, x_train, x_test, y_test,
-                              predictions, save_results_dir)
-
-                logging.info(f'INFO: Model evaluated')
-        except Exception:
-            logging.error(f'ERROR: Error in pipeline CustomerChurn')
+                self.eval(model_fitted, x_train, x_test, y_test, predictions, save_results_dir)
+                logging.info(f'Model {model} evaluated')
+        except BaseException as e:
+            logging.error(f' {e} in pipeline CustomerChurn')

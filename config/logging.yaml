@@ -6,7 +6,7 @@ formatters:
 handlers:
   console:
     class: logging.StreamHandler
-    level: DEBUG
+    level: INFO
     formatter: simple
     stream: ext://sys.stdout
   file:
@@ -15,7 +15,7 @@ handlers:
     formatter: simple
     filename: 'logs/logconfig.log'
     maxBytes: 2000
-    backupCount: 10
+    backupCount: 100
 loggers:
   customer_churn:
     level: DEBUG
