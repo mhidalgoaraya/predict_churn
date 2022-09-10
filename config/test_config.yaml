@@ -1,0 +1,43 @@
+
+name: 'Predict_customer_churn'
+DIRECTORIES:
+    DATA_DIR: 'data'
+    MODEL_DIR: 'models'
+    RESULTS_DIR: 'results'
+
+DATA_INFO:
+    CATEGORICAL_COLS:
+        - 'Gender'
+        - 'Marital_Status'
+    NUMERICAL_COLS:
+        - 'Customer_Age'
+        - 'Credit_Limit'
+    TARGET_COL: 'Attrition_Flag'
+    ENCODING_TARGET:
+        0: 'Existing Customer'
+        1: 'Attrited Customer'
+    NEW_TARGET_COL: 'Churn'
+TEST_SIZE: 0.3
+PARAM_GRID:
+    compute: True
+    cv: 5
+    probabilities: True
+    parameters:
+        n_estimators:
+            - 200
+            - 500
+        max_features:
+            - 'auto'
+            - 'sqrt'
+        max_depth:
+            - 4
+            - 5
+            - 100
+        criterion:
+            - 'gini'
+            - 'entropy'
+    n_jobs: -1
+    verbose: 2
+LOGISTIC_REGRESSION:
+    MAX_ITER: 200
+RANDOM_STATE: 42
