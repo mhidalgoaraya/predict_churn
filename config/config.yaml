@@ -36,7 +36,7 @@ TEST_SIZE: 0.3
 PARAM_GRID:
     compute: True
     cv: 5
-    probabilities: True
+    probabilities: False
     parameters:
         n_estimators:
             - 200

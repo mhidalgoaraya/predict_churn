@@ -256,8 +256,7 @@ class DataExploration:
                                         save_dir)
             self.bivariate_exploration(data, self.config['DATA_INFO'],
                                        save_dir)
-            self.correlation_matrix(data, self.config['DATA_INFO'],
-                                    save_dir)
+            self.correlation_matrix(data, save_dir)
 
         except BaseException as e:
             logging.error(f" Unable to perform EDA analysis {e}")
@@ -347,7 +346,6 @@ class DataExploration:
     @staticmethod
     def correlation_matrix(
             data: pd.DataFrame,
-            data_info: dict,
             save_dir: Path):
         """
         :param data: data for exploration
@@ -389,11 +387,11 @@ class CustomerChurn(DataExploration, EncoderHelper, Evaluate):
             project_dir = self.config['DIRECTORIES']['PROJECT_DIR']
             data_dir = Path(project_dir, self.config['DIRECTORIES']
                             ['DATA_DIR'], 'bank_data.csv')
-            df = import_data(data_dir)
+            data = import_data(data_dir)
 
             # %% Preprocessing
-            self.eda(df)
-            data = self.encode(df)
+            self.eda(data)
+            data = self.encode(data)
             x_train, x_test, y_train, y_test = \
                 split_data(data, self.config['DATA_INFO']['NEW_TARGET_COL'],
                            self.config['TEST_SIZE'],
@@ -412,7 +410,7 @@ class CustomerChurn(DataExploration, EncoderHelper, Evaluate):
                     param = self.config['PARAM_GRID']
 
                 model_fitted, predictions = train_model(
-                    x_train, x_test, y_train, y_test, model, param_grid=param,
+                    x_train, x_test, y_train, model, param_grid=param,
                     save_dir=save_model_dir)
                 logging.info(f'Model {model} trained')
                 save_results_dir = Path(

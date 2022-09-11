@@ -73,16 +73,15 @@ def train_model(x_train: pd.DataFrame, x_test: pd.DataFrame,
     """
 
     try:
-        if param_grid is not None:
-            if param_grid['compute']:
-                g_search = GridSearchCV(
+        if param_grid is not None and param_grid['compute']:
+            g_search = GridSearchCV(
                     estimator=model,
                     param_grid=dict(param_grid['parameters']),
                     cv=param_grid['cv'], n_jobs=param_grid['n_jobs'],
                     verbose=param_grid['verbose'])
-                model_fit = g_search.fit(x_train, y_train)
+            model_fit = g_search.fit(x_train, y_train)
         else:
-            model_fit = model.fit(y_train, y_train)
+            model_fit = model.fit(x_train, y_train)
 
         logging.info('has been fitted {}'.format(model))
 
@@ -90,11 +89,9 @@ def train_model(x_train: pd.DataFrame, x_test: pd.DataFrame,
             save_model(save_dir, model)
             logging.info('Model saved: {}'.format(model))
 
-        if param_grid is not None:
-            if param_grid['probabilities']:
-                predictions = model_fit.predict_proba(x_test)
-                logging.info('Prediction made on test data '
-                             'using probability')
+        if param_grid is not None and param_grid['probabilities']:
+            predictions = model_fit.predict_proba(x_test)
+            logging.info('Prediction made on test data ')
         else:
             predictions = model_fit.predict(x_test)
             logging.info('Prediction made on standard model fit')
